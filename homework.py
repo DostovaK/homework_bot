@@ -2,7 +2,6 @@ import logging
 import os
 import time
 from http import HTTPStatus
-from logging import StreamHandler
 
 import requests
 import telegram
@@ -20,11 +19,6 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
 )
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = StreamHandler()
-
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -60,8 +54,9 @@ def get_api_answer(current_timestamp):
     except exceptions.APIResponseError:
         logging.error('Сбой запроса к эндпойнту')
     if response.status_code != HTTPStatus.OK:
-        logging.error('Статус отличен от 200')
-        raise exceptions.APIResponseError
+        error_text = 'Статус отличен от 200'
+        logging.error(error_text)
+        raise exceptions.APIResponseError(error_text)
     return response.json()
 
 
@@ -70,14 +65,17 @@ def check_response(response):
     try:
         homework_list = response['homeworks']
     except KeyError as error:
-        logging.error(f'Ошибка доступа: {error}')
-        raise exceptions.CheckResponseError
+        error_text = f'Ошибка доступа: {error}'
+        logging.error(error_text)
+        raise exceptions.CheckResponseError(error_text)
     if len(homework_list) == 0:
-        logging.error('Список домашних работ пуст')
-        raise exceptions.CheckResponseError
+        error_text = 'Список домашних работ пуст'
+        logging.error(error_text)
+        raise exceptions.CheckResponseError(error_text)
     if not isinstance(homework_list, list):
-        logging.error('Домашние работы приходят не списком')
-        raise exceptions.HomeWorkTypeError
+        error_text = 'Домашние работы приходят не списком'
+        logging.error(error_text)
+        raise exceptions.HomeWorkTypeError(error_text)
     return homework_list
 
 
@@ -94,8 +92,9 @@ def parse_status(homework):
 
     verdict = HOMEWORK_STATUSES[homework_status]
     if verdict is None:
-        logging.error('Статус неизвестен')
-        raise exceptions.ParseStatusError('Неизвестный статус домашки')
+        error_text = 'Неизвестный статус домашки'
+        logging.error(error_text)
+        raise exceptions.ParseStatusError(error_text)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -113,12 +112,14 @@ def main():
             'Отсутствует один из токенов'
         )
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = 1655989614
+    current_timestamp = 1654989614
+
     while True:
         try:
             response = get_api_answer(current_timestamp)
         except exceptions.APIIncorrectResponseError as error:
             logging.error(f'Ошибка: {error}')
+            time.sleep(RETRY_TIME)
 
         try:
             current_timestamp = int(time.time())
