@@ -103,22 +103,24 @@ def main():
         )
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = 0
-    errors = True
+    previous_status = None
+    previous_error = None
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
             homework = check_response(response)
             homework_status = parse_status(homework[0])
-            if homework_status is not None:
+            if homework_status != previous_status:
+                previous_status = homework_status
                 send_message(bot, homework_status)
             else:
                 logging.debug('Нет обновлений')
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            if errors:
-                errors = False
+            if previous_error != str(error):
+                previous_error = str(error)
                 send_message(bot, message)
             logging.debug(message)
 
