@@ -15,10 +15,6 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
 )
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -41,17 +37,16 @@ def send_message(bot, message):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info('Сообщение отправлено')
-    except exceptions.MessageSendingError as error:
+    except Exception as error:
         logging.error(f'Ошибка отправки сообщения: {error}')
 
 
 def get_api_answer(current_timestamp):
     """Делает запрос к единственному эндпоинту API-сервиса."""
-    timestamp = current_timestamp or int(time.time())
-    params = {'from_date': timestamp}
+    params = {'from_date': current_timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    except exceptions.APIResponseError:
+    except Exception:
         logging.error('Сбой запроса к эндпойнту')
     if response.status_code != HTTPStatus.OK:
         error_text = 'Статус отличен от 200'
@@ -83,18 +78,13 @@ def parse_status(homework):
     """Извлекает из информации о конкретной домашней работе её статус."""
     try:
         homework_name = homework.get('homework_name')
-    except KeyError as error:
-        logging.error(f'Ошибка доступа: {error}')
-    try:
         homework_status = homework.get('status')
-    except KeyError as error:
-        logging.error(f'Ошибка доступа: {error}')
-
+    except exceptions.HomeWorkParseError:
+        if homework_name is None:
+            error_text = 'Неизвестный статус домашки'
+            logging.error(error_text)
+            raise exceptions.ParseStatusError(error_text)
     verdict = HOMEWORK_STATUSES[homework_status]
-    if verdict is None:
-        error_text = 'Неизвестный статус домашки'
-        logging.error(error_text)
-        raise exceptions.ParseStatusError(error_text)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -112,26 +102,18 @@ def main():
             'Отсутствует один из токенов'
         )
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = 1654989614
+    current_timestamp = 0
     errors = True
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
-        except exceptions.APIIncorrectResponseError as error:
-            logging.error(f'Ошибка: {error}')
-            time.sleep(RETRY_TIME)
-
-        try:
-            current_timestamp = int(time.time())
             homework = check_response(response)
-            homework_status = homework[0].get('status')
+            homework_status = parse_status(homework[0])
             if homework_status is not None:
-                message = parse_status(homework[0])
-                send_message(bot, message)
+                send_message(bot, homework_status)
             else:
                 logging.debug('Нет обновлений')
-            time.sleep(RETRY_TIME)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
@@ -139,9 +121,10 @@ def main():
                 errors = False
                 send_message(bot, message)
             logging.debug(message)
-            time.sleep(RETRY_TIME)
+
         else:
             logging.debug('Обновлений нет')
+        time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':

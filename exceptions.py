@@ -1,9 +1,3 @@
-class MessageSendingError(Exception):
-    """Исключение: сообщение не отправилось."""
-
-    pass
-
-
 class APIResponseError(Exception):
     """Исключение: запрос к эндпойнту сервиса не удался."""
 
@@ -12,6 +6,12 @@ class APIResponseError(Exception):
 
 class CheckResponseError(Exception):
     """Исключение: ответ API некорректный."""
+
+    pass
+
+
+class HomeWorkParseError(Exception):
+    """Исключение: сообщение не отправилось."""
 
     pass
 
