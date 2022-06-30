@@ -16,6 +16,7 @@ logging.basicConfig(
     format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
 )
 
+
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
@@ -38,7 +39,7 @@ def send_message(bot, message):
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info('Сообщение отправлено')
     except Exception as error:
-        logging.error(f'Ошибка отправки сообщения: {error}')
+        logging.exception(f'Ошибка отправки сообщения: {error}')
 
 
 def get_api_answer(current_timestamp):
@@ -47,11 +48,9 @@ def get_api_answer(current_timestamp):
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except Exception:
-        logging.error('Сбой запроса к эндпойнту')
+        logging.exception('Сбой запроса к эндпойнту')
     if response.status_code != HTTPStatus.OK:
-        error_text = 'Статус отличен от 200'
-        logging.error(error_text)
-        raise exceptions.APIResponseError(error_text)
+        raise exceptions.APIResponseError('Статус отличен от 200')
     return response.json()
 
 
@@ -59,18 +58,12 @@ def check_response(response):
     """Проверяет ответ API на корректность."""
     try:
         homework_list = response['homeworks']
-    except KeyError as error:
-        error_text = f'Ошибка доступа: {error}'
-        logging.error(error_text)
-        raise exceptions.CheckResponseError(error_text)
+    except exceptions.CheckResponseError as error:
+        logging.exception(f'Ошибка доступа: {error}')
     if len(homework_list) == 0:
-        error_text = 'Список домашних работ пуст'
-        logging.error(error_text)
-        raise exceptions.CheckResponseError(error_text)
+        raise exceptions.CheckResponseError('Список домашних работ пуст')
     if not isinstance(homework_list, list):
-        error_text = 'Домашние работы приходят не списком'
-        logging.error(error_text)
-        raise exceptions.HomeWorkTypeError(error_text)
+        raise exceptions.HomeWorkTypeError('Домашки приходят не списком')
     return homework_list
 
 
@@ -81,9 +74,7 @@ def parse_status(homework):
         homework_status = homework.get('status')
     except exceptions.HomeWorkParseError:
         if homework_name is None:
-            error_text = 'Неизвестный статус домашки'
-            logging.error(error_text)
-            raise exceptions.ParseStatusError(error_text)
+            raise exceptions.ParseStatusError('Неизвестный статус домашки')
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -97,7 +88,7 @@ def main():
     """Основная логика работы бота."""
     logging.debug('Бот запущен')
     if not check_tokens():
-        logging.critical('Отсутсвует переменная среды')
+        logging.critical('Отсутствует переменная среды')
         raise exceptions.MissingRequiredTokenError(
             'Отсутствует один из токенов'
         )
@@ -122,7 +113,7 @@ def main():
             if previous_error != str(error):
                 previous_error = str(error)
                 send_message(bot, message)
-            logging.debug(message)
+            logging.exception(message)
 
         else:
             logging.debug('Обновлений нет')
